@@ -1,67 +1,87 @@
 import React, { useEffect, useState } from "react";
-import { GoogleApiWrapper, Map, Marker } from "google-maps-react";
+import { GoogleApiWrapper, Map, Marker, InfoWindow } from "google-maps-react";
 import circle from "../../assets/green-circle.png"
+import './Map.css';
 
 export class MapContainer extends React.Component {
-  state = { center: { lat: 37.95, lng: -121.941 }, markers: null };
+  state = { center: { lat: 37.95, lng: -121.941 }, markers: null, activeMarker: null, selectedPlace: null, activeRate: null, blockData: null };
 
-  clickMarker = (props, markers) => {
-    console.log(props.placeId);
+  clickMarker = (props, marker, e) => {
+    this.setState({
+      activeMarker: marker,
+      selectedPlace: props.place_id,
+      activeRate: marker.rate
+    });
   };
 
-  
+  closeInfoWindow = () => {
+    this.setState({
+      activeMarker: null,
+      selectedPlace: null,
+      activeRate: null
+    });
+  };
   
   componentDidMount() {
-    var myHeaders = new Headers();
-    myHeaders.append(
-      "Authorization",
-      "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhcHBJZCI6ImdsYjUwZWUzb2oiLCJ0b2tlbiI6eyJpdiI6ImFiZjE0MTdjM2NmZTMyY2YwNTQwZjcxZTlmYTg3MDc0IiwiY29udGVudCI6Ijc1NDM0YzFjN2ZlZDg0YTE2ZTIzM2UyMmMwNjZiNDQyN2Q5ZjA0ZWFkNDg0OTM4NTRjNTQ5NDUzNDE1ZTk4MDg5Y2MzZmU2YTJkYWZiM2YzZTY3NTQ1ZmYwNmI4NDAwNGJjZmZlNDU4ZmZkNmVmNDg0MmQzNzIzNTM4ODc2ZWI2ODNiMTBiNDg3MGU4ODRlNDc3OWJjMTA0MTk3ZDkwYmVlYTAxZjFkYzg3MWE3OTg1NjlhZDhhODExYjFjNTgzMjgyMTVmNjg1OWY0NWYyYmQ1YjU0MDgxMGE0NjhjM2MyMGMwMTg5M2ZhZmQxNmQyMTAxZDJjMDE0NWVmMmFkYTVkMThhMDY4NTgzYTBhNzc0ODgxODIyNThhMjc4NDNlYTdjM2VmZWYwMzkwZTVlOTllY2I0OWFhZjg4YWRkN2YyNjU4NDE2YTM4YTczMDBlMjdkY2RlZDdhZWY2NDYwMjMyNTBhN2RjNTZjODlmMTk0OTIzMDkxYTYwODQwOWRlNjQyODFjOTA0MDFmYTE4NzdhMzUxMDI2YzkyMzk0MjQ3OWNjZTVhYjM2ZWQ0NjA3MzcxMzU2ZDY2OGMzZjk5ZjQzMTJiZDVmOWZkZDM1YmE2MDE5OGQ3NmIwODdmOWIyMTZiOGE0ZTdiZWExYzNlOTAyZTVjN2ZjMjI0ZTMzNDA3NmI3MjUyM2EwYzJiNjkyOGU1ZjQ2ZDQxZjg5NDI4YjhlMjMxYzE2NzA0YTllZjg4YjNmN2UzZmQ0MThkZmIwNTA4NzcwM2ViM2FlOGFmNWFhNDg3MTcxODQ2MjYyN2E4NGMxOGY1NmU4ZmEzN2EwY2Q0MjVjNTI1MmM3OGJjOWFjMGUzYzYwOWYxYzU2ODQxOWM5YTY3In0sInNlY3VyaXR5VG9rZW4iOnsiaXYiOiJhYmYxNDE3YzNjZmUzMmNmMDU0MGY3MWU5ZmE4NzA3NCIsImNvbnRlbnQiOiI2MDA5MzM0NTI0ZDk5MTg2NTkyNDFmMDVjZDJmOWUzYjc4OTIwN2ZjY2VhM2E4ODM2Yzc4YTcyOTc5NDJhZDAzYjJkOWQ2Mzg2MmIyZjljMWU4MjQzZGMxIn0sImp0aSI6ImVmOThjNTIxLWQ0NTEtNGYwMi05ZDZmLWYyYzIzZWQyNzQwYyIsImlhdCI6MTcwMTU3MTcwOCwiZXhwIjoxNzAxNTc1MzA4fQ.PJEVCd7K5ceCmh6vQ8hYLs9wetAW8gyUFLNRVRTah9k"  
-    );
-  
-    var requestOptions = {
-      method: 'GET',
-      headers: myHeaders,
-      redirect: 'follow'
+    const parkingLotUrl =
+      "https://api.iq.inrix.com/lots/v3?point=37.74638779388551%7C-122.42209196090698&radius=3000";
+    const blockDataUrl =
+      "https://api.iq.inrix.com/blocks/v3?point=37.74638779388551%7C-122.42209196090698&radius=1000";
+
+    const fetchData = (url, stateKey) => {
+      var myHeaders = new Headers();
+      myHeaders.append(
+        "Authorization",
+        "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhcHBJZCI6ImdsYjUwZWUzb2oiLCJ0b2tlbiI6eyJpdiI6IjQyODM4YWQyM2Y0ZTRiOTM3Mjg2ZDFlMGFmZTk1Y2UwIiwiY29udGVudCI6ImNmMDVmN2Q1ODY0MTYwNzc5YWNiZjdlMjA5OGJjOWZhZGY3YjQ1ZWNmMjMwOTA4ZGRlMTY3Nzc5NDI4MGJhMjliMTYzZmM4M2FlNGViOTkzMTFiMTUzMTc4MTNiYjdmOWJjZTNmYjkwNDdiMTQ2NmZiODE2ZWUxMmJhNTNiYjQ3NTZmYWM4NWQzMmI3OTgzYjk2MTAzOGNlZDNmZDY1ZmNhN2EzYzA1ZTI3MWVkZjExM2YxMjJiNDg2YjA5MjJhZDhkN2Q2ZDA1MDVmNTY1ZTIwY2EyYWEzMTM1MDNjODNhN2I3MWE1YzBjZDJkNjc2NzdiMGFkNzVlN2RmYmIwNTc5ZjhhYjQ2MjVjMzMzZDM4M2M1YThmMjcyOGYwNmRlNjU1YTM3ODFjZWIxNjVlOWEwMTk2MGQzMTFiN2RmYmQ5NTVjMWM2OTBlZjA4ZmM1ZjNjZDk2MTA4MmMxMDM1MGI5ODQ4NjcxMmVmYTliODg5YWJiNGI2NzU4ZWRlZmFhNGE2ZjA1YWYwNTE1YzcwMGIzYTU3YzM3N2Y5ZGE1MDVmNGZjYzk3NTgxODE1NGY0YTAzNmZiNzliNTYxYzZkOThkZWEzZmE3MzQxNDE0ZTU4Zjk3YjJhNzFhNjUyZGU5ZjNjNDEzN2VjMDIyOTgwOGFmZmI1NzYwNjRjYjU3OThhNmQyMzM0MzhlMWNkMTViNjU2NjQ4MGE0Y2QxNzcyMjJkMjUzMTE2NjYyNmUwOWIyMDRkMGY0YzNlMTgzOTljYzM2OGFmZWZiOTgzNTY2MmZjY2QxZTdiZDRjNjQzNzIwMzlkODQwNjEwMTUzZDZkZGYwMGFjNDk0MDVlNjMxNjA0OTg1NTM3ZTJlZDdiZDE2YmMxYjBlIn0sInNlY3VyaXR5VG9rZW4iOnsiaXYiOiI0MjgzOGFkMjNmNGU0YjkzNzI4NmQxZTBhZmU5NWNlMCIsImNvbnRlbnQiOiJlYzEwZjJjYzk1NDk2OTMzOTFmMGM3ZjEzYTk4ZGE4NWUxNzA0M2QyY2YzYWE2ZjFmODM2NzQzOTM4YWQ5ZDQwODAwYWY0ZDdjMzczYTNiMjFjOTM1MjI5In0sImp0aSI6ImFhNzdiNjhkLTY5ZjYtNDYyNi1iNGViLTk2YTA3YmRkZDAwMyIsImlhdCI6MTcwMTU4ODMwMCwiZXhwIjoxNzAxNTkxOTAwfQ.AAnj6R3Pz0KnCFRu5TN_s815oWvMdmQk-vOGjQMRlnE"  
+      );
+
+      var requestOptions = {
+        method: 'GET',
+        headers: myHeaders,
+        redirect: 'follow'
+      };
+      
+      fetch(url, requestOptions)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then((data) => {
+          if (data && data.result && Array.isArray(data.result)) {
+            const parsedData = data.result.map((item) => ({
+              rate: item.rateCard,
+              place_id: item.id,
+              position: {
+                lat: item.peps[0].pepPt[1],
+                lng: item.peps[0].pepPt[0],
+              },
+            }));
+
+            this.setState({ [stateKey]: parsedData });
+          } else {
+            console.error("Invalid data format:", data);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching data:", error.message);
+        });
     };
-  
-    fetch("https://api.iq.inrix.com/lots/v3?point=37.74638779388551%7C-122.42209196090698&radius=2000", requestOptions)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        if (data && data.result && Array.isArray(data.result)) {  // Check if data.result is an array
-          const parsedMarkers = data.result.map(item => ({
-            place_id: item.id,
-            position: {
-              lat: item.peps[0].pepPt[1],
-              lng: item.peps[0].pepPt[0],
-            }
-          }));
-  
-          this.setState({ markers: parsedMarkers });
-        } else {
-          console.error('Invalid data format:', data);
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching data:', error.message);
-      });
+
+    fetchData(parkingLotUrl, "markers");
+    fetchData(blockDataUrl, "blockData");
   }
   
   
   render() {
     const { google } = this.props;
-  
     console.log('Rendering markers:', this.state.markers);
-  
     return (
       <Map
         google={google}
         center={this.state.center}
-        style={{ height: "100%", position: "relative", width: "100%" }}
+        style={{ height: "90%", position: "relative", width: "100%" }}
         zoom={16}
       >
         {this.state.markers != null &&
@@ -69,14 +89,47 @@ export class MapContainer extends React.Component {
             <Marker
               key={marker.place_id}
               position={marker.position}
-              onClick={() => this.clickMarker({ placeId: marker.place_id })}
+              onClick={(props, marker, e) => this.clickMarker(props, marker, e)}
               icon={{
                 url: circle,  // URL of the green circle image
                 anchor: new google.maps.Point(16, 16),  // Adjust the anchor point based on the image size
                 scaledSize: new google.maps.Size(32, 32),  // Adjust the size of the image
               }}
+              
             />
           ))}
+
+          {this.state.blockData &&
+          this.state.blockData.map((block) => (
+            <Marker
+              key={block.place_id}
+              position={block.position}
+              onClick={(props, marker, e) => this.clickMarker(props, marker, e)}
+              icon={{
+                url: circle,
+                anchor: new google.maps.Point(16, 16),
+                scaledSize: new google.maps.Size(32, 32),
+              }}
+            />
+          ))}
+        <InfoWindow
+  marker={this.state.activeMarker}
+  visible={this.state.activeMarker !== null}
+  onClose={this.closeInfoWindow}
+>
+  <div>
+    <h4>{this.state.selectedPlace}</h4>
+    {this.state.activeMarker && this.state.markers ? (
+      <div>
+        <p>Rate Information:</p>
+        <p>{this.state.markers[0].rate[0]}</p>
+      </div>
+    ) : (
+      <p>Rate information not available</p>
+    )}
+  </div>
+
+</InfoWindow>
       </Map>
     );
   } 
