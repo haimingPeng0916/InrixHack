@@ -18,11 +18,13 @@ rf = Roboflow(api_key=line) # publishable api key
 project = rf.workspace().project("pklot-1tros")
 model = project.version(2).model
 
+# inputs[i] = (img, x, y)
+inputs = []
 imgs = [] # input list
 res = []
-for img in imgs:
+for img, x, y in inputs:
     a, b, p = predict_percentage(model, img) # output percentage
-    res.append((a,b,p))
+    res.append((x, y, a, b, p))
 
 out_file = "output.csv"
 with open(out_file, 'w', newline='') as csv_file:
